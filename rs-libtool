@@ -1,0 +1,126 @@
+#!/bin/bash
+
+_edit_date=2025-10-12
+_version=0.1
+
+
+_prg_name="$0"
+
+_verbose=0
+_save_temps=0
+
+while true
+do
+case "$1" in
+"--help")
+    echo "Usage: $_prg_name [OPTIONS...] [--] input-file output-file"
+    echo "Transforms a Rust staticlib into a format suitable for linking to other programs"
+    echo "Options:"
+    printf "\t--help: Displays this message and exits"
+    printf "\t--version: Displays version information and exits"
+    printf "\t--verbose: Prints verbose information. (Passing --verbose --verbose additionally prints diagnostic information)"
+    printf "\t--save-temps: Do not remove temporary files after completion."
+    exit 0
+    ;;
+"--version")
+    echo "rs-libtool Version $_version (Build Date: $_edit_date)"
+    exit 0
+    ;;
+"--verbose")
+    _verbose="$(("$_verbose" + 1))"
+    ;;
+"--save-temps")
+    _save_temps=1
+    ;;
+"--target")
+    _target="$2"
+    _target_prefix="$_target-"
+    shift
+    ;;
+"--strip")
+    _strip=1
+    ;;
+"--")
+    shift
+    break
+    ;;
+"--*")
+    echo "Unrecognized Option $1" 1>&2
+    exit 1
+    ;;
+"*")
+    break
+esac
+shift
+done
+
+if [ "$_strip" = 1 ]
+then
+    _strip="${STRIP:-${_target_prefix}strip}"
+else
+    _strip=true
+fi
+
+_input="$1"
+
+_output="${2:-$1}"
+
+_dir="$(mktemp -d)"
+
+_to_remove="$_to_remove ${_dir}"
+
+function close_and_exit {
+    [ "$_save_temps" -lt 1 ] && rm -rf $_to_remove
+    exit $1
+}
+
+[ "$_verbose" -ge 2 ] && echo "Working Directory: $_dir"
+
+_ar="${AR:-${_target_prefix}ar}"
+_ld="${LD:-${_target_prefix}ld}"
+_nm="${NM:-${_target_prefix}nm}"
+_objcopy="${OBJCOPY:-${_target_prefix}objcopy}"
+
+if [ "$_verbose" -ge 1 ]
+then
+   "${_ar}" t "${_input}"
+fi
+
+[ "$_verbose" -ge 1 ] && echo "${_ar} x --output ${_dir} ${_input}"
+"${_ar}" x --output "${_dir}" "${_input}" || close_and_exit 1
+
+_tmp2="$(mktemp --suffix=.o)"
+_to_remove="$_to_remove ${_tmp2}"
+[ "$_verbose" -ge 1 ] && echo "${_ld}" -r -o "${_tmp2}" "${_dir}/*"
+"${_ld}" -r -o "${_tmp2}" "${_dir}"/* || close_and_exit 1
+
+[ $_verbose -ge 2 ] && nm -j "${_tmp2}" | grep -E "^((_R[0-9]*[CMNYXYIB][A-Za-z0-9_]*)|(_Z[A-Za-z0-9_.\$]*h[0-9a-f]{16,}E))$"
+
+_local_symbols="$(nm -j "${_tmp2}" | grep -E "^((_R[0-9]*[CMNYXYIB][A-Za-z0-9_]*)|(_Z[A-Za-z0-9_.\$]*h[0-9a-f]{16,}E))$")"
+
+
+while IFS="" read -r _val
+do
+    _objcopy_args="--localize-symbol=$_val $_objcopy_args"
+done <<< "$_local_symbols"
+
+
+[ "$_verbose" -ge 1 ] && echo "${_objcopy}" $_objcopy_args --localize-hidden "${_tmp2}" 
+"${_objcopy}" $_objcopy_args --localize-hidden "${_tmp2}" || close_and_exit 1
+
+[ "$_verbose" -ge 1 ] && echo strip -x "${_tmp2}"
+${_strip} -x ${_tmp2} || close_and_exit 1
+
+_tmp3="$(mktemp -d)"
+_to_remove="$_to_remove $_tmp3"
+[ "$_verbose" -ge 1 ] && echo "${_ar}" rcs "${_output}" "${_tmp2}"
+"${_ar}" rcs "${_tmp3}/$(basename ${_output})" "${_tmp2}" || close_and_exit 1
+
+if [ "$_verbose" -ge 1 ]
+then
+_vf=-v
+fi
+
+mv $_vf -f "${_tmp3}/$(basename ${_output})" "${_output}" 
+
+close_and_exit 0
