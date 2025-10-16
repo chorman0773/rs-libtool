@@ -13,7 +13,7 @@
 # EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 _edit_date=2025-10-16
-_version=0.1
+_version=0.2
 
 
 _prg_name="$0"
@@ -28,10 +28,10 @@ case "$1" in
     echo "Usage: $_prg_name [OPTIONS...] [--] input-file output-file"
     echo "Transforms a Rust staticlib into a format suitable for linking to other programs"
     echo "Options:"
-    printf "\t--help: Displays this message and exits"
-    printf "\t--version: Displays version information and exits"
-    printf "\t--verbose: Prints verbose information. (Passing --verbose --verbose additionally prints diagnostic information)"
-    printf "\t--save-temps: Do not remove temporary files after completion."
+    printf "\t--help: Displays this message and exits\n"
+    printf "\t--version: Displays version information and exits\n"
+    printf "\t--verbose: Prints verbose information. (Passing --verbose --verbose additionally prints diagnostic information)\n"
+    printf "\t--save-temps: Do not remove temporary files after completion.\n"
     exit 0
     ;;
 "--version")
