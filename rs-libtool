@@ -32,6 +32,8 @@ case "$1" in
     printf "\t--version: Displays version information and exits\n"
     printf "\t--verbose: Prints verbose information. (Passing --verbose --verbose additionally prints diagnostic information)\n"
     printf "\t--save-temps: Do not remove temporary files after completion.\n"
+    printf "\t--target <target>: Prefix invoked tools with <target>\n"
+    printf "\t--strip: strip the resulting library\n"
     exit 0
     ;;
 "--version")
