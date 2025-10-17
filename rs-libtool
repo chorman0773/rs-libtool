@@ -140,6 +140,13 @@ case "$1" in
         _v_count="${1#-}"
         _v_count="${#_v_count}"
         
+        # The easter egg case should have been caught above, but double-check
+        if [ "$_v_count" -eq 6 ]; then
+            echo "Detected short-verbose spam, redirecting your anger..."
+            xdg-open https://store.steampowered.com/app/70300/VVVVVV/ &
+            exit 1
+        fi
+        
         # Generate paragraphs using LLM
         generate_llm_paragraphs "$_v_count"
         exit 0
