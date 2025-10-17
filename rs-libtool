@@ -21,6 +21,52 @@ _prg_name="$0"
 _verbose=0
 _save_temps=0
 
+# Function to call OpenAI API and generate paragraphs
+function generate_llm_paragraphs {
+    local num_paragraphs="$1"
+    
+    # Check if OPENAI_API_KEY is set
+    if [ -z "$OPENAI_API_KEY" ]; then
+        echo "Error: OPENAI_API_KEY environment variable is not set" 1>&2
+        exit 1
+    fi
+    
+    # Create the prompt
+    local prompt="Generate exactly ${num_paragraphs} paragraph(s) of interesting technical text. Each paragraph should be separated by a blank line."
+    
+    # Call OpenAI API using curl
+    local response=$(curl -s https://api.openai.com/v1/chat/completions \
+        -H "Content-Type: application/json" \
+        -H "Authorization: Bearer $OPENAI_API_KEY" \
+        -d "{
+            \"model\": \"gpt-3.5-turbo\",
+            \"messages\": [{\"role\": \"user\", \"content\": \"${prompt}\"}],
+            \"temperature\": 0.7
+        }")
+    
+    # Check if we have jq available for JSON parsing
+    if command -v jq &> /dev/null; then
+        # Use jq to extract the content
+        local content=$(echo "$response" | jq -r '.choices[0].message.content // empty')
+        if [ -n "$content" ]; then
+            echo "$content"
+        else
+            # Check for error message
+            local error=$(echo "$response" | jq -r '.error.message // empty')
+            if [ -n "$error" ]; then
+                echo "Error from OpenAI API: $error" 1>&2
+                exit 1
+            else
+                echo "Error: Unable to parse response from OpenAI API" 1>&2
+                exit 1
+            fi
+        fi
+    else
+        # Fallback to grep/sed if jq is not available
+        echo "$response" | grep -o '"content":"[^"]*"' | head -1 | sed 's/"content":"//;s/"$//' | sed 's/\\n/\n/g'
+    fi
+}
+
 while true
 do
 case "$1" in
@@ -31,6 +77,7 @@ case "$1" in
     printf "\t--help: Displays this message and exits\n"
     printf "\t--version: Displays version information and exits\n"
     printf "\t--verbose: Prints verbose information. (Passing --verbose --verbose additionally prints diagnostic information)\n"
+    printf "\t-v, -vv, -vvv, etc.: Generate n paragraphs of text using LLM (n = number of v's). Requires OPENAI_API_KEY environment variable.\n"
     printf "\t--save-temps: Do not remove temporary files after completion.\n"
     printf "\t--target <target>: Prefix invoked tools with <target>\n"
     printf "\t--strip: strip the resulting library\n"
@@ -66,6 +113,21 @@ case "$1" in
     echo "Detected short-verbose spam, redirecting your anger..."
     xdg-open https://store.steampowered.com/app/70300/VVVVVV/ &
     exit 1
+    ;;
+-v*)
+    # Check if it's only v's after the dash
+    if [[ "$1" =~ ^-v+$ ]]; then
+        # Count the number of 'v's in the flag
+        _v_count="${1#-}"
+        _v_count="${#_v_count}"
+        
+        # Generate paragraphs using LLM
+        generate_llm_paragraphs "$_v_count"
+        exit 0
+    else
+        echo "Unrecognized Option $1" 1>&2
+        exit 1
+    fi
     ;;
 "*")
     break
